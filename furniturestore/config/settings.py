@@ -168,6 +168,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "https://furniture-store-frontend-seven.vercel.app/"
 ]
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
