@@ -90,7 +90,7 @@ class LoginAPIView(APIView):
 
 
 class ChangePasswordAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def patch(self, request, *args, **kwargs):
         old_password = request.data.get("old_password")
@@ -154,6 +154,6 @@ class ChangePasswordAPIView(APIView):
     
 
 class UserListAPIView(ListAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
     serializer_class = UserListSerializer
     queryset = User.objects.all().order_by("-id")

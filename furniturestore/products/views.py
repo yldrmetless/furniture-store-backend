@@ -27,7 +27,7 @@ from products.serializers import (
 # Create your views here.
 
 class CategoryCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         name = request.data.get("name")
@@ -111,7 +111,7 @@ class CategoryListAPIView(ListAPIView):
 
 
 class CategoryDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, id):
         try:
@@ -272,7 +272,7 @@ class CloudinaryUploadAPIView(APIView):
 
 
 class ProductCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -400,7 +400,7 @@ class ProductCreateAPIView(APIView):
 
 
 class ProductCreateForProjectAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -606,7 +606,7 @@ class ProductDetailCustomerAPIView(APIView):
 
 
 class ProductDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, id, *args, **kwargs):
         image_qs = (
@@ -938,7 +938,7 @@ class ProjectDetailAPIView(APIView):
 
 
 class CreateReferenceCategoryAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -1000,7 +1000,7 @@ class ReferenceCategoryListAPIView(APIView):
         return paginated
 
 class CreateReferenceAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -1160,7 +1160,7 @@ class ReferenceListAPIView(APIView):
 
 
 class ReferenceUpdateAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def patch(self, request, id, *args, **kwargs):
