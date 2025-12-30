@@ -400,7 +400,6 @@ class ProductCreateAPIView(APIView):
 
 
 class ProductCreateForProjectAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -606,7 +605,6 @@ class ProductDetailCustomerAPIView(APIView):
 
 
 class ProductDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, id, *args, **kwargs):
         image_qs = (
@@ -938,7 +936,6 @@ class ProjectDetailAPIView(APIView):
 
 
 class CreateReferenceCategoryAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -1000,7 +997,6 @@ class ReferenceCategoryListAPIView(APIView):
         return paginated
 
 class CreateReferenceAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -1160,7 +1156,6 @@ class ReferenceListAPIView(APIView):
 
 
 class ReferenceUpdateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def patch(self, request, id, *args, **kwargs):
