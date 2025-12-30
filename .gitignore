@@ -1,0 +1,43 @@
+# ======================
+# Python / Django
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+*.log
+
+# Django
+staticfiles/
+media/
+
+# ======================
+# Virtual Environment
+# ======================
+venv/
+.env
+.env.*
+.env.local
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ======================
+# Testing / Coverage
+# ======================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ======================
+# Migrations (opsiyonel)
+# ======================
+# Eğer migration’ları git'e atmak istiyorsan bunu SİL
+**/migrations/__pycache__/

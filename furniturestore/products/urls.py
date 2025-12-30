@@ -1,0 +1,101 @@
+from django.urls import path
+
+from products.views import (
+    CategoryCreateAPIView,
+    CategoryDetailAPIView,
+    CategoryListAPIView,
+    CloudinaryUploadAPIView,
+    ProductCreateAPIView,
+    ProductListAPIView,
+    ProductDetailAPIView,
+    ProductDetailCustomerAPIView,
+    CreateReferenceAPIView,
+    CreateReferenceCategoryAPIView,
+    ReferenceListAPIView,
+    ReferenceCategoryListAPIView,
+    ReferenceUpdateAPIView,
+    ReferenceDetail,
+    ProjectListAPIView,
+    ProductCreateForProjectAPIView,
+    ProjectDetailAPIView
+)
+
+urlpatterns = [
+    path("create-category/", CategoryCreateAPIView.as_view(), name="create-category"),
+    path("category-list/", CategoryListAPIView.as_view(), name="category-list"),
+    path(
+        "category-detail/<int:id>/",
+        CategoryDetailAPIView.as_view(),
+        name="category-detail",
+    ),
+    path(
+        "cloudinary-upload/",
+        CloudinaryUploadAPIView.as_view(),
+        name="cloudinary-upload",
+    ),
+    path(
+        "create-product/",
+        ProductCreateAPIView.as_view(),
+        name="create-product",
+    ),
+    path(
+        "create-project/",
+        ProductCreateForProjectAPIView.as_view(),
+        name="create-project",
+    ),
+    path(
+        "product-list/",
+        ProductListAPIView.as_view(),
+        name="product-list",
+    ),
+    path(
+        "project-list/",
+        ProjectListAPIView.as_view(),
+        name="project-list",
+    ),
+    path(
+        "product-detail/<int:id>",
+        ProductDetailAPIView.as_view(),
+        name="product-detail",
+    ),
+    path(
+        "project-detail/<int:id>",
+        ProjectDetailAPIView.as_view(),
+        name="project-detail",
+    ),
+    path(
+        "product-detail-customer/<int:id>",
+        ProductDetailCustomerAPIView.as_view(),
+        name="product-detail-customer",
+    ),
+    path(
+        "create-reference",
+        CreateReferenceAPIView.as_view(),
+        name="create-reference",
+    ),
+    path(
+        "ref-category-list",
+        ReferenceCategoryListAPIView.as_view(),
+        name="reference-category-list",
+    ),
+    path(
+        "create-ref-category",
+        CreateReferenceCategoryAPIView.as_view(),
+        name="create-ref-category",
+    ),
+    path(
+        "reference-list/",
+        ReferenceListAPIView.as_view(),
+        name="reference-list",
+    ),
+    path(
+        "reference-detail/<int:id>",
+        ReferenceUpdateAPIView.as_view(),
+        name="reference-detail",
+    ),
+    path(
+        "reference-detail-customer/<int:id>",
+        ReferenceDetail.as_view(),
+        name="reference-detail-customer",
+    ),
+]
