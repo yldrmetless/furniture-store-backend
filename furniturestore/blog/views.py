@@ -7,7 +7,6 @@ from blog.models import Blog
 from products.pagination import Pagination10
 
 class BlogCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
