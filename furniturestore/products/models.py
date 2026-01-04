@@ -11,6 +11,10 @@ class Products(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     updated_at = models.DateTimeField(auto_now=True)
+    
+    stock = models.IntegerField(default=0)
+    
+    stock_code = models.CharField(max_length=100, null=True, blank=True)
 
     is_deleted = models.BooleanField(default=False)
 

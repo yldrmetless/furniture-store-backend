@@ -49,7 +49,9 @@ class ProductListSerializer(serializers.ModelSerializer):
             "updated_at",
             "category_name",
             "images",
-            "product_type"
+            "product_type",
+            "stock",
+            "stock_code",
         ]
 
     def get_category_name(self, obj):

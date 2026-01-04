@@ -282,6 +282,8 @@ class ProductCreateAPIView(APIView):
         tags = request.data.get("tags")
         category_id = request.data.get("category_id")
         images = request.data.get("images", [])
+        stock = request.data.get("stock", 0)
+        stock_code = (request.data.get("stock_code") or "").strip()
 
         if not name:
             return Response(
@@ -304,6 +306,12 @@ class ProductCreateAPIView(APIView):
                     {"status": 400, "message": "Kategori bulunamadı."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+                
+        if not isinstance(stock, int):
+            return Response(
+                {"status": 400, "message": "Stok sayısı integer olmalıdır."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
             
             
 
@@ -332,6 +340,8 @@ class ProductCreateAPIView(APIView):
             slug=slug,
             tags=tags_value,
             category=category,
+            stock=stock,
+            stock_code=stock_code or None,
         )
 
         if images in (None, ""):
@@ -707,6 +717,19 @@ class ProductDetailAPIView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 product.category = category
+                
+        if "stock" in data_in:
+            stock = data_in.get("stock")
+            if not isinstance(stock, int):
+                return Response(
+                    {"status": 400, "message": "Stok sayısı integer olmalıdır."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            product.stock = stock
+            
+        if "stock_code" in data_in:
+            stock_code = (data_in.get("stock_code") or "").strip()
+            product.stock_code = stock_code or None
 
         product.save()
 
