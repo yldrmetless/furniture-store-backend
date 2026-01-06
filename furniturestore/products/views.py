@@ -1,30 +1,35 @@
 
+import os
 import cloudinary.uploader
 from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from products.serializers import ProductListSerializer,ProjectListSerializer
+from products.serializers import ProductListSerializer,ProjectListSerializer,CatalogSerializer,LandingPageListSerializer
 from django.db.models import Prefetch
 from django.db.models import Count, Q
-
+import os
+from django.conf import settings
 from products.models import (
     Category,
     ProductImage,
     Products,
     ReferenceImage,
     ReferenceModel,
-    ReferenceCategory
+    ReferenceCategory,
+    CatalogModel,
+    LandingPage
 )
 from products.pagination import Pagination10
 from products.serializers import (
     CategoryListSerializer,
 )
-# Create your views here.
+from django.db import IntegrityError
+
 
 class CategoryCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -189,11 +194,91 @@ class CategoryDetailAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
+ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
+MAX_BYTES = 8 * 1024 * 1024
+import logging
+logger = logging.getLogger(__name__)
+class CloudinaryUploadProductAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        folder = (request.data.get("folder") or "").strip() or None
+        single = request.FILES.get("file")
+        multiple = request.FILES.getlist("files")
+
+        files = []
+        if single:
+            files = [single]
+        elif multiple:
+            files = multiple
+
+        if not files:
+            return Response(
+                {"status": 400, "message": "Dosya bulunamadı."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        raw_fligran_id = getattr(settings, "FLIGRAN_PUBLIC_ID", None)
+        fligran_id = raw_fligran_id.split(".")[0] if raw_fligran_id else None
+
+        out = []
+        for f in files:
+            ct = getattr(f, "content_type", None)
+
+            if ct not in ALLOWED_MIME:
+                continue
+
+            if getattr(f, "size", 0) > MAX_BYTES:
+                return Response(
+                    {
+                        "status": 400,
+                        "message": f"Dosya çok büyük: {MAX_BYTES} byte sınırı var.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                upload_params = {
+                    "folder": folder,
+                    "resource_type": "image",
+                    "overwrite": False,
+                    "unique_filename": True,
+                }
+
+                if fligran_id:
+                    upload_params["transformation"] = [
+                        {"width": "1.0", "height": "1.0", "flags": "relative"},
+                        {"overlay": fligran_id, "flags": "tiled"},
+                    ]
+
+                res = cloudinary.uploader.upload(f, **upload_params)
+
+                out.append(
+                    {
+                        "url": res.get("secure_url") or res.get("url"),
+                        "public_id": res.get("public_id"),
+                        "width": res.get("width"),
+                        "height": res.get("height"),
+                        "bytes": res.get("bytes"),
+                        "format": res.get("format"),
+                        "original_filename": res.get("original_filename"),
+                    }
+                )
+
+            except Exception as e:
+                print(f"Cloudinary API Error: {str(e)}")
+                return Response(
+                    {"status": 500, "detail": str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        return Response({"status": 200, "results": out}, status=status.HTTP_200_OK)
 
 ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
 MAX_BYTES = 8 * 1024 * 1024  # 8MB (istersen değiştir)
 
-class CloudinaryUploadAPIView(APIView):
+class CloudinaryUploadCategoryAPIView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -221,7 +306,7 @@ class CloudinaryUploadAPIView(APIView):
 
         if not files:
             return Response(
-                {"status": 400, "detail": "No file provided. Send 'file' or 'files'."},
+                {"status": 400, "message": "Dosya bulunamadı."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -230,13 +315,13 @@ class CloudinaryUploadAPIView(APIView):
             ct = getattr(f, "content_type", None)
             if ct not in ALLOWED_MIME:
                 return Response(
-                    {"status": 400, "detail": f"Invalid file type: {ct}. Allowed: jpg, png, webp."},
+                    {"status": 400, "message": f"Geçersiz dosya tipi: {ct}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if getattr(f, "size", 0) > MAX_BYTES:
                 return Response(
-                    {"status": 400, "detail": f"File too large: {f.size} bytes. Max: {MAX_BYTES}."},
+                    {"status": 400, "message": f"Dosya çok büyük: {f.size} bytes. Maksimum: {MAX_BYTES}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -267,10 +352,146 @@ class CloudinaryUploadAPIView(APIView):
             )
 
         return Response({"status": 200, "results": out}, status=status.HTTP_200_OK)
+
+
+class CatalogUploadPDF(APIView):
+    permission_classes = [IsAuthenticated] 
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        name = request.data.get("name")
+        image_url = request.data.get("url")
+        public_id = request.data.get("public_id")
+        pdf_file = request.FILES.get("pdf")
+
+        if not pdf_file:
+            return Response({
+                "status": 400, 
+                "message": "Katalog PDF dosyası zorunludur."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            new_catalog = CatalogModel.objects.create(
+                name=name,
+                url=image_url,
+                public_id=public_id,
+                pdf_file=pdf_file
+            )
+
+            return Response({
+                "status": 200,
+                "message": "Katalog başarıyla kaydedildi.",
+                "results": {
+                    "id": new_catalog.id,
+                    "name": new_catalog.name,
+                    "pdf_url": request.build_absolute_uri(new_catalog.pdf_file.url),
+                    "cover_image_url": new_catalog.url
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                "status": 500, 
+                "message": f"Kayıt sırasında bir hata oluştu: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+class CatalogListAPIView(ListAPIView):
+    pagination_class = Pagination10
+    serializer_class = CatalogSerializer
     
+    def get_queryset(self):
+        return CatalogModel.objects.filter(is_deleted=False).order_by("-created_at", "-id")
 
+    def get(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        
+        serializer = self.get_serializer(page, many=True, context={'request': request})
+        
+        paginated_data = self.get_paginated_response(serializer.data).data
 
+        return Response(
+            {
+                "status": 200,
+                **paginated_data,
+            },
+            status=200,
+        )
+        
 
+class CatalogDetailAPIView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request, id, *args, **kwargs):
+        try:
+            catalog = CatalogModel.objects.get(id=id, is_deleted=False)
+        except CatalogModel.DoesNotExist:
+            return Response(
+                {"status": 404, "message": "Katalog bulunamadı."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = CatalogSerializer(catalog, context={"request": request})
+        return Response(
+            {"status": 200, "data": serializer.data},
+            status=status.HTTP_200_OK,
+        )
+    
+    def patch(self, request, id, *args, **kwargs):
+        try:
+            catalog = CatalogModel.objects.get(id=id, is_deleted=False)
+        except CatalogModel.DoesNotExist:
+            return Response(
+                {"status": 404, "message": "Katalog bulunamadı."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        is_deleted_val = request.data.get("is_deleted")
+        if str(is_deleted_val).lower() == "true":
+            if catalog.pdf_file:
+                catalog.pdf_file.delete(save=False)
+            
+            catalog.is_deleted = True
+            catalog.pdf_file = None
+            catalog.url = None
+            catalog.public_id = None
+            catalog.save()
+            
+            return Response(
+                {"status": 200, "message": "Katalog silindi ve dosyalar temizlendi."},
+                status=status.HTTP_200_OK
+            )
+
+        name = request.data.get("name")
+        image_url = request.data.get("url")
+        public_id = request.data.get("public_id")
+        new_pdf = request.FILES.get("pdf")
+
+        if name:
+            catalog.name = name
+        if image_url:
+            catalog.url = image_url
+        if public_id:
+            catalog.public_id = public_id
+        
+        if new_pdf:
+            if catalog.pdf_file:
+                catalog.pdf_file.delete(save=False)
+            catalog.pdf_file = new_pdf
+
+        catalog.save()
+
+        serializer = CatalogSerializer(catalog, context={"request": request})
+        return Response(
+            {
+                "status": 200, 
+                "message": "Katalog başarıyla güncellendi.", 
+                "data": serializer.data
+            },
+            status=status.HTTP_200_OK,
+        )
+    
 class ProductCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -440,7 +661,7 @@ class ProductCreateForProjectAPIView(APIView):
             description=description,
             product_type=None,
             slug=slug,
-            for_project=True
+            for_project=True,
         )
 
         if images in (None, ""):
@@ -584,6 +805,120 @@ class ProjectListAPIView(ListAPIView):
 
         return qs
     
+# class ProjectDetailAPIView(APIView):
+#     def get(self, request, id, *args, **kwargs):
+#         image_qs = (
+#             ProductImage.objects.filter(is_deleted=False)
+#             .order_by("-id")
+#         )
+
+#         try:
+#             product = (
+#                 Products.objects.select_related("category")
+#                 .prefetch_related(Prefetch("images", queryset=image_qs))
+#                 .get(id=id, is_deleted=False, for_project=True)
+#             )
+#         except Products.DoesNotExist:
+#             return Response(
+#                 {"status": 404, "message": "Proje bulunamadı."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
+
+#         serializer = ProjectListSerializer(product, context={"request": request})
+#         return Response(
+#             {"status": 200, "data": serializer.data},
+#             status=status.HTTP_200_OK,
+#         )
+        
+#     @transaction.atomic
+#     def patch(self, request, id, *args, **kwargs):
+#         name = (request.data.get("name") or "").strip()
+#         description = (request.data.get("description") or "").strip()
+
+#         try:
+#             product = Products.objects.get(id=id, is_deleted=False, for_project=True)
+#         except Products.DoesNotExist:
+#             return Response(
+#                 {"status": 404, "message": "Proje bulunamadı."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
+
+#         if name:
+#             product.name = name
+
+#         if description:
+#             product.description = description
+
+#         product.save()
+
+#         if "images" in request.data:
+#             images = request.data.get("images")
+
+#             if images in (None, ""):
+#                 images = []
+
+#             if not isinstance(images, list):
+#                 return Response(
+#                     {"status": 400, "message": "Resimler doğru formatta gönderilmelidir."},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             ProductImage.objects.filter(product=product, is_deleted=False).update(is_deleted=True)
+
+#             created_images = []
+#             for idx, img in enumerate(images):
+#                 if not isinstance(img, dict):
+#                     return Response(
+#                         {"status": 400, "message": "Resim doğru formatta gönderilmelidir."},
+#                         status=status.HTTP_400_BAD_REQUEST,
+#                     )
+
+#                 image_url = (img.get("image_url") or "").strip()
+#                 public_id = (img.get("public_id") or "").strip()
+
+#                 if not image_url:
+#                     return Response(
+#                         {"status": 400, "message": "Resim URL'si zorunludur."},
+#                         status=status.HTTP_400_BAD_REQUEST,
+#                     )
+
+#                 pi = ProductImage.objects.create(
+#                     product=product,
+#                     image_url=image_url,
+#                     public_id=public_id or None,
+#                     is_primary=True if idx == 0 else False,
+#                     is_deleted=False,
+#                 )
+
+#                 created_images.append(
+#                     {
+#                         "id": pi.id,
+#                         "image_url": pi.image_url,
+#                         "alt_text": pi.alt_text,
+#                         "public_id": pi.public_id,
+#                         "is_primary": pi.is_primary,
+#                     }
+#                 )
+
+#             return Response(
+#                 {
+#                     "status": 200,
+#                     "data": {
+#                         "id": product.id,
+#                         "name": product.name,
+#                         "description": product.description,
+#                         "product_type": product.product_type,
+#                         "slug": product.slug,
+#                         "images": created_images,
+#                         "created_at": product.created_at,
+#                     },
+#                 },
+#                 status=status.HTTP_200_OK,
+#             )
+
+#         serializer = ProjectListSerializer(product, context={"request": request})
+#         return Response({"status": 200, "data": serializer.data}, status=status.HTTP_200_OK)
+        
 
 
 
@@ -820,6 +1155,7 @@ class ProjectDetailAPIView(APIView):
             "images": images_out,
             "created_at": product.created_at,
             "updated_at": product.updated_at,
+            "description": product.description,
         }
 
     def get(self, request, id, *args, **kwargs):
@@ -894,6 +1230,11 @@ class ProjectDetailAPIView(APIView):
                 slug_candidate = f"{base_slug}-{counter}"
                 counter += 1
             product.slug = slug_candidate
+            
+        if "description" in data_in:
+            product.description = (data_in.get("description") or "").strip()
+            product.description = product.description or ""
+
 
         product.save()
 
@@ -1381,3 +1722,207 @@ class ReferenceDetail(APIView):
             },
             status=status.HTTP_200_OK,
         )
+        
+
+ALLOWED_FONTS = {
+    "inter",
+    "poppins",
+    "montserrat",
+    "manrope",
+    "dm-sans",
+    "nunito-sans",
+    "playfair",
+    "lora",
+    "merriweather",
+    "cormorant-garamond",
+}
+class LandingPagePostCreateAPIView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+
+        section_key = data.get("section_key")
+        title = data.get("title", "").strip()
+        description = data.get("description", "")
+        title_en = data.get("title_en", "").strip()
+        description_en = data.get("description_en", "")
+        image_url = data.get("image_url")
+        public_id = data.get("public_id")
+        title_font_family = data.get("title_font_family")
+        font_family = data.get("font_family")
+        
+
+        if not section_key:
+            return Response(
+                {"detail": "Oluşturulacak alan seçimi zorunludur."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if LandingPage.objects.filter(
+            section_key=section_key,
+            is_deleted=False
+        ).exists():
+            return Response(
+                {"detail": "Bu alan için zaten kayıt mevcut."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if title_font_family and title_font_family not in ALLOWED_FONTS:
+            return Response(
+                {"detail": "Geçersiz yazı tipi değeri."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if font_family and font_family not in ALLOWED_FONTS:
+            return Response(
+                {"detail": "Geçersiz yazı tipi değeri."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            section = LandingPage.objects.create(
+                section_key=section_key,
+                title=title,
+                description=description,
+                title_en=title_en,
+                description_en=description_en,
+                image_url=image_url,
+                public_id=public_id,
+                title_font_family=title_font_family,
+                font_family=font_family,
+            )
+        except IntegrityError:
+            return Response(
+                {"detail": "Kayıt oluşturulamadı."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "id": section.id,
+                "section_key": section.section_key,
+                "title": section.title,
+                "description": section.description,
+                "title_en": section.title_en,
+                "description_en": section.description_en,
+                "image_url": section.image_url,
+                "public_id": section.public_id,
+                "title_font_family": section.title_font_family,
+                "font_family": section.font_family,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+        
+
+class LandingPageListAPIView(APIView):
+    pagination_class = Pagination10
+
+    def get(self, request, *args, **kwargs):
+        queryset = LandingPage.objects.filter(is_deleted=False).order_by("id")
+
+        section_key = request.query_params.get("section_key")
+        if section_key:
+            queryset = queryset.filter(section_key=section_key)
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+
+        serializer = LandingPageListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+    
+
+
+class LandingPageDetailAPIView(APIView):
+    def get(self, request, id, *args, **kwargs):
+        try:
+            landing_page = LandingPage.objects.get(
+                id=id,
+                is_deleted=False
+            )
+        except LandingPage.DoesNotExist:
+            return Response(
+                {"detail": "Kayıt bulunamadı."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = LandingPageListSerializer(landing_page)
+
+        return Response(
+            {
+                "data": serializer.data
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+    def patch(self, request, id, *args, **kwargs):
+        try:
+            landing_page = LandingPage.objects.get(id=id, is_deleted=False)
+        except LandingPage.DoesNotExist:
+            return Response(
+                {"detail": "Kayıt bulunamadı."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = request.data
+        
+        
+        is_deleted = data.get("is_deleted")
+        
+        if is_deleted is True or (isinstance(is_deleted, str) and str(is_deleted).lower() == "true"):
+            landing_page.is_deleted = True
+            landing_page.save(update_fields=["is_deleted"])
+            return Response(
+                {"detail": "Kayıt silindi."},
+                status=status.HTTP_200_OK,
+            )
+            
+        title = data.get("title")
+        description = data.get("description")
+        title_en = data.get("title_en")
+        description_en = data.get("description_en")
+        image_url = data.get("image_url")
+        public_id = data.get("public_id")
+        title_font_family = data.get("title_font_family")
+        font_family = data.get("font_family")
+        section_key = data.get("section_key")
+
+        if title is not None:
+            landing_page.title = title.strip()
+
+        if description is not None:
+            landing_page.description = description
+            
+        if title_en is not None:
+            landing_page.title_en = title_en.strip()
+
+        if description_en is not None:
+            landing_page.description_en = description_en
+
+        if image_url is not None:
+            landing_page.image_url = image_url
+
+        if public_id is not None:
+            landing_page.public_id = public_id
+            
+        if section_key is not None:
+            landing_page.section_key = section_key
+
+        if title_font_family is not None:
+            if title_font_family and title_font_family not in ALLOWED_FONTS:
+                return Response(
+                    {"detail": "Geçersiz yazı tipi değeri."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            landing_page.title_font_family = title_font_family
+
+        if font_family is not None:
+            if font_family and font_family not in ALLOWED_FONTS:
+                return Response(
+                    {"detail": "Geçersiz yazı tipi değeri."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            landing_page.font_family = font_family
+
+        landing_page.save()
+
+        serializer = LandingPageListSerializer(landing_page)
+        return Response(serializer.data)

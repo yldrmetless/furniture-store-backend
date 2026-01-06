@@ -122,3 +122,44 @@ class ReferenceImage(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
+
+
+
+class CatalogModel(models.Model):
+    name = models.CharField(max_length=255, blank=True, null=True)
+    
+    url = models.URLField(max_length=2000, null=True, blank=True)
+    
+    public_id = models.CharField(max_length=255, blank=True, null=True)
+    
+    pdf_file = models.FileField(upload_to='catalogs/pdfs/', null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    
+    is_deleted = models.BooleanField(default=False)
+    
+    
+class LandingPage(models.Model):
+    section_key = models.CharField(max_length=255, blank=True, null=True)
+    
+    title = models.CharField(max_length=255, blank=True, null=True)
+    
+    description = models.CharField(max_length=2048, blank=True, null=True)
+    
+    title_en = models.CharField(max_length=255, blank=True, null=True)
+    
+    description_en = models.CharField(max_length=2048, blank=True, null=True)
+    
+    image_url = models.URLField(max_length=2000, null=True, blank=True)
+    
+    public_id = models.CharField(max_length=255, blank=True, null=True) 
+    
+    title_font_family = models.CharField(max_length=255, blank=True, null=True)
+    
+    font_family = models.CharField(max_length=255, blank=True, null=True)
+    
+    is_deleted = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)

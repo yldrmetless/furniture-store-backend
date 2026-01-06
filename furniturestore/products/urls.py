@@ -1,10 +1,12 @@
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 
 from products.views import (
     CategoryCreateAPIView,
     CategoryDetailAPIView,
     CategoryListAPIView,
-    CloudinaryUploadAPIView,
+    CloudinaryUploadProductAPIView,
     ProductCreateAPIView,
     ProductListAPIView,
     ProductDetailAPIView,
@@ -17,7 +19,15 @@ from products.views import (
     ReferenceDetail,
     ProjectListAPIView,
     ProductCreateForProjectAPIView,
-    ProjectDetailAPIView
+    ProjectDetailAPIView,
+    CatalogUploadPDF,
+    CatalogListAPIView,
+    CatalogDetailAPIView,
+    CloudinaryUploadCategoryAPIView,
+    ProjectDetailAPIView,
+    LandingPagePostCreateAPIView,
+    LandingPageListAPIView,
+    LandingPageDetailAPIView
 )
 
 urlpatterns = [
@@ -29,9 +39,29 @@ urlpatterns = [
         name="category-detail",
     ),
     path(
-        "cloudinary-upload/",
-        CloudinaryUploadAPIView.as_view(),
+        "cloudinary-upload-product/",
+        CloudinaryUploadProductAPIView.as_view(),
         name="cloudinary-upload",
+    ),
+    path(
+        "cloudinary-upload-catalog/",
+        CloudinaryUploadCategoryAPIView.as_view(),
+        name="cloudinary-upload-category",
+    ),
+    path(
+        "create-catalog/",
+        CatalogUploadPDF.as_view(),
+        name="create-catalog",
+    ),
+    path(
+        "catalog-list/",
+        CatalogListAPIView.as_view(),
+        name="catalog-list",
+    ),
+    path(
+        "catalog-detail/<int:id>/",
+        CatalogDetailAPIView.as_view(),
+        name="catalog-detail",
     ),
     path(
         "create-product/",
@@ -52,6 +82,11 @@ urlpatterns = [
         "project-list/",
         ProjectListAPIView.as_view(),
         name="project-list",
+    ),
+    path(
+        "project-detail/<int:id>/",
+        ProjectDetailAPIView.as_view(),
+        name="project-detail",
     ),
     path(
         "product-detail/<int:id>",
@@ -97,5 +132,20 @@ urlpatterns = [
         "reference-detail-customer/<int:id>",
         ReferenceDetail.as_view(),
         name="reference-detail-customer",
+    ),
+    path(
+        "landing-page-post-create/",
+        LandingPagePostCreateAPIView.as_view(),
+        name="landing-page-post-create",
+    ),
+    path(
+        "landing-page-list/",
+        LandingPageListAPIView.as_view(),
+        name="landing-page-list",
+    ),
+    path(
+        "landing-page-detail/<int:id>/",
+        LandingPageDetailAPIView.as_view(),
+        name="landing-page-detail",
     ),
 ]

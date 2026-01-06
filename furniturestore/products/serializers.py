@@ -2,8 +2,9 @@ from rest_framework import serializers
 
 from .models import (
     Category,
-    ProductImage,
     Products,
+    CatalogModel,
+    LandingPage
 )
 
 from decimal import Decimal
@@ -52,6 +53,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             "product_type",
             "stock",
             "stock_code",
+            "for_project"
         ]
 
     def get_category_name(self, obj):
@@ -77,3 +79,62 @@ class ProjectListSerializer(serializers.ModelSerializer):
     def get_images(self, obj):
         imgs = obj.images.filter(is_deleted=False)
         return [{"url": i.image_url} for i in imgs if i.image_url]
+
+
+class CatalogSerializer(serializers.ModelSerializer):
+    pdf_url = serializers.SerializerMethodField()
+    cover_image_url = serializers.ReadOnlyField(source='url')
+
+    class Meta:
+        model = CatalogModel
+        fields = ["id", "name", "cover_image_url", "pdf_url", "created_at"]
+
+    def get_pdf_url(self, obj):
+        if obj.pdf_file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.pdf_file.url)
+            return obj.pdf_file.url
+        return None
+    
+    
+
+ALLOWED_FONTS = {
+    "inter",
+    "poppins",
+    "montserrat",
+    "manrope",
+    "dm-sans",
+    "nunito-sans",
+    "playfair",
+    "lora",
+    "merriweather",
+    "cormorant-garamond",
+}
+
+
+class LandingPageListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandingPage
+        fields = (
+            "id",
+            "section_key",
+            "title",
+            "description",
+            "image_url",
+            "public_id",
+            "title_font_family",
+            "font_family",
+            "title_en",
+            "description_en",
+        )
+
+    def validate_title_font_family(self, value):
+        if value and value not in ALLOWED_FONTS:
+            raise serializers.ValidationError("Geçersiz yazı tipi değeri.")
+        return value
+
+    def validate_font_family(self, value):
+        if value and value not in ALLOWED_FONTS:
+            raise serializers.ValidationError("Geçersiz yazı tipi değeri.")
+        return value
