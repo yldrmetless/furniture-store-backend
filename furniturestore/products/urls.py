@@ -27,7 +27,10 @@ from products.views import (
     ProjectDetailAPIView,
     LandingPagePostCreateAPIView,
     LandingPageListAPIView,
-    LandingPageDetailAPIView
+    LandingPageDetailAPIView,
+    BannerImageCreate,
+    BannerImageListAPIView,
+    BannerImageDetailAPIView
 )
 
 urlpatterns = [
@@ -147,5 +150,20 @@ urlpatterns = [
         "landing-page-detail/<int:id>/",
         LandingPageDetailAPIView.as_view(),
         name="landing-page-detail",
+    ),
+    path(
+        "banner-image-create/",
+        BannerImageCreate.as_view(),
+        name="banner-image-create",
+    ),
+    path(
+        "banner-image-list/",
+        BannerImageListAPIView.as_view(),
+        name="banner-image-list",
+    ),
+    path(
+        "banner-image-detail/<int:id>/",
+        BannerImageDetailAPIView.as_view(),
+        name="banner-image-detail",
     ),
 ]

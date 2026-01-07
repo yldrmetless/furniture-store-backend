@@ -4,12 +4,10 @@ from .models import (
     Category,
     Products,
     CatalogModel,
-    LandingPage
+    LandingPage,
+    BannerImageModel
 )
 
-from decimal import Decimal
-from django.db.models.functions import Coalesce
-from django.db.models import Sum
 
 class CategoryListSerializer(serializers.ModelSerializer):
     product_count = serializers.IntegerField(read_only=True)
@@ -138,3 +136,17 @@ class LandingPageListSerializer(serializers.ModelSerializer):
         if value and value not in ALLOWED_FONTS:
             raise serializers.ValidationError("Geçersiz yazı tipi değeri.")
         return value
+    
+
+
+class BannerImageListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BannerImageModel
+        fields = [
+            "id",
+            "image_url",
+            "alt_text",
+            "public_id",
+            "is_primary",
+            "created_at",
+        ]

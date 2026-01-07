@@ -163,3 +163,25 @@ class LandingPage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    
+
+
+class BannerImageModel(models.Model):
+    image_url = models.URLField(max_length=2000, null=True, blank=True)
+
+    alt_text = models.CharField(max_length=255, blank=True, null=True)
+
+    is_primary = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    public_id = models.CharField(max_length=255, blank=True, null=True)
+
+    is_deleted = models.BooleanField(default=False)
+
+class Banner(models.Model):
+    banner = models.ForeignKey(
+        BannerImageModel,
+        on_delete=models.CASCADE,
+        related_name="banners",
+    )

@@ -9,9 +9,13 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from products.serializers import ProductListSerializer,ProjectListSerializer,CatalogSerializer,LandingPageListSerializer
+from products.serializers import ProductListSerializer,ProjectListSerializer,CatalogSerializer,LandingPageListSerializer, BannerImageListSerializer
 from django.db.models import Prefetch
 from django.db.models import Count, Q
+from urllib.parse import unquote_plus
+from django.db.models.functions import Lower, Replace
+from django.db.models import Value
+
 import os
 from django.conf import settings
 from products.models import (
@@ -22,7 +26,9 @@ from products.models import (
     ReferenceModel,
     ReferenceCategory,
     CatalogModel,
-    LandingPage
+    LandingPage,
+    BannerImageModel,
+    Banner
 )
 from products.pagination import Pagination10
 from products.serializers import (
@@ -749,11 +755,25 @@ class ProductListAPIView(ListAPIView):
         if product_type:
             qs = qs.filter(product_type__icontains=product_type)
 
-        category_name = (self.request.query_params.get("category") or "").strip()
+        category_name = unquote_plus(
+            self.request.query_params.get("category_name")
+            or self.request.query_params.get("category")
+            or ""
+        ).strip()
+
         if category_name:
-            qs = qs.filter(
-                category__is_deleted=False,
-                category__name__icontains=category_name,
+            normalized = category_name.lower().replace(",", "").replace(" ", "")
+
+            qs = qs.annotate(
+                normalized_category=Replace(
+                    Replace(
+                        Lower("category__name"),
+                        Value(","), Value("")
+                    ),
+                    Value(" "), Value("")
+                )
+            ).filter(
+                normalized_category__icontains=normalized
             )
 
         order_by = (self.request.query_params.get("order_by") or "desc").lower()
@@ -1926,3 +1946,189 @@ class LandingPageDetailAPIView(APIView):
 
         serializer = LandingPageListSerializer(landing_page)
         return Response(serializer.data)
+    
+    
+    
+
+class BannerImageCreate(APIView):
+    """
+    Body:
+    {
+      "images": [
+        {"image_url": "...", "public_id": "...", "alt_text": "..."},
+        {"image_url": "...", "public_id": "..."}
+      ]
+    }
+
+    - Her image için BannerImageModel + Banner oluşturur
+    - Sistemde hiç primary yoksa, bu batch'in ilk elemanı is_primary=True olur
+    """
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        images = request.data.get("images")
+
+        if not isinstance(images, list) or not images:
+            return Response(
+                {"detail": "images alanı dolu bir liste olmalıdır."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        primary_exists = BannerImageModel.objects.filter(is_deleted=False, is_primary=True).exists()
+
+        created = []
+        for idx, item in enumerate(images):
+            if not isinstance(item, dict):
+                return Response(
+                    {"detail": f"images[{idx}] obje olmalıdır."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            image_url = (item.get("image_url") or "").strip()
+            public_id = (item.get("public_id") or "").strip()
+            alt_text = (item.get("alt_text") or "").strip() or None
+
+            if not image_url or not public_id:
+                return Response(
+                    {"detail": f"images[{idx}] için image_url ve public_id zorunludur."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            is_primary = (not primary_exists) and (idx == 0)
+
+            banner_image = BannerImageModel.objects.create(
+                image_url=image_url,
+                public_id=public_id,
+                alt_text=alt_text,
+                is_primary=is_primary,
+            )
+
+            banner = Banner.objects.create(banner=banner_image)
+
+            created.append(
+                {
+                    "id": banner_image.id,
+                    "banner_id": banner.id,
+                    "image_url": banner_image.image_url,
+                    "public_id": banner_image.public_id,
+                    "alt_text": banner_image.alt_text,
+                    "is_primary": banner_image.is_primary,
+                    "created_at": banner_image.created_at,
+                }
+            )
+
+        return Response(
+            {
+                "count": len(created),
+                "results": created,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+        
+
+class BannerImageListAPIView(APIView):
+    pagination_class = Pagination10
+
+    def get(self, request, *args, **kwargs):
+        qs = (
+            BannerImageModel.objects
+            .filter(is_deleted=False)
+            .order_by("id")
+        )
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = BannerImageListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+class BannerImageDetailAPIView(APIView):
+    def get(self, request, id, *args, **kwargs):
+        try:
+            banner_image = BannerImageModel.objects.get(
+                id=id,
+                is_deleted=False
+            )
+        except BannerImageModel.DoesNotExist:
+            return Response(
+                {"detail": "Kayıt bulunamadı."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = BannerImageListSerializer(banner_image)
+
+        return Response(
+            {
+                "data": serializer.data
+            },
+            status=status.HTTP_200_OK,
+        )
+        
+    @transaction.atomic
+    def patch(self, request, id, *args, **kwargs):
+        try:
+            banner_image = BannerImageModel.objects.get(id=id, is_deleted=False)
+        except BannerImageModel.DoesNotExist:
+            return Response(
+                {"detail": "Kayıt bulunamadı."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = request.data
+        is_deleted = data.get("is_deleted")
+
+        if is_deleted is True or (isinstance(is_deleted, str) and str(is_deleted).lower() == "true"):
+            banner_image.is_deleted = True
+            banner_image.is_primary = False
+            banner_image.save(update_fields=["is_deleted", "is_primary"])
+
+            next_primary = (
+                BannerImageModel.objects
+                .filter(is_deleted=False, id__gt=banner_image.id)
+                .order_by("id")
+                .first()
+            )
+
+            if next_primary is None:
+                next_primary = (
+                    BannerImageModel.objects
+                    .filter(is_deleted=False)
+                    .order_by("id")
+                    .first()
+                )
+
+            if next_primary:
+                BannerImageModel.objects.filter(is_deleted=False, is_primary=True).update(is_primary=False)
+                next_primary.is_primary = True
+                next_primary.save(update_fields=["is_primary"])
+
+                return Response(
+                    {
+                        "detail": "Kayıt silindi. Yeni primary atandı.",
+                        "new_primary_id": next_primary.id,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            return Response(
+                {"detail": "Kayıt silindi. Aktif kayıt kalmadığı için primary atanmadı."},
+                status=status.HTTP_200_OK,
+            )
+
+        image_url = data.get("image_url")
+        public_id = data.get("public_id")
+        alt_text = data.get("alt_text")
+
+        if image_url is not None:
+            banner_image.image_url = image_url
+
+        if public_id is not None:
+            banner_image.public_id = public_id
+
+        if alt_text is not None:
+            banner_image.alt_text = alt_text
+
+        banner_image.save()
+
+        serializer = BannerImageListSerializer(banner_image)
+        return Response(serializer.data, status=status.HTTP_200_OK)
