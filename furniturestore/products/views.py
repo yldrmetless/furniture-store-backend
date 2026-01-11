@@ -254,8 +254,13 @@ class CloudinaryUploadProductAPIView(APIView):
 
                 if fligran_id:
                     upload_params["transformation"] = [
-                        {"width": "1.0", "height": "1.0", "flags": "relative"},
-                        {"overlay": fligran_id, "flags": "tiled"},
+                        {
+                            "overlay": fligran_id,
+                            "gravity": "center",
+                            "flags": "relative",
+                            "width": 0.7,
+                            "crop": "scale"
+                        }
                     ]
 
                 res = cloudinary.uploader.upload(f, **upload_params)
