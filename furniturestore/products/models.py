@@ -6,7 +6,7 @@ from users.models import Users
 class Products(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
 
-    description = models.CharField(max_length=2048, null=True, blank=True)
+    description = models.CharField(max_length=6000, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -60,6 +60,10 @@ class Category(models.Model):
     name = models.CharField(max_length=255)
 
     description = models.CharField(max_length=2048)
+    
+    name_eng = models.CharField(max_length=255, null=True, blank=True)
+    
+    description_eng = models.CharField(max_length=2048, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -176,6 +180,8 @@ class BannerImageModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     public_id = models.CharField(max_length=255, blank=True, null=True)
+
+    link_url = models.URLField(max_length=2000, null=True, blank=True)
 
     is_deleted = models.BooleanField(default=False)
 

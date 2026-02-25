@@ -30,7 +30,7 @@ from products.models import (
     BannerImageModel,
     Banner
 )
-from products.pagination import Pagination10
+from products.pagination import Pagination10, Pagination30
 from products.serializers import (
     CategoryListSerializer,
 )
@@ -42,7 +42,9 @@ class CategoryCreateAPIView(APIView):
 
     def post(self, request):
         name = request.data.get("name")
+        name_eng = request.data.get("name_eng")
         description = request.data.get("description")
+        description_eng = request.data.get("description_eng")
         image_url = request.data.get("image_url")
         public_id = request.data.get("public_id")
 
@@ -62,7 +64,9 @@ class CategoryCreateAPIView(APIView):
 
         category = Category.objects.create(
             name=name,
+            name_eng=name_eng or None,
             description=description or "",
+            description_eng=description_eng or "",
             slug=slug,
             image_url=image_url or None,
             public_id=public_id or None,
@@ -143,6 +147,7 @@ class CategoryDetailAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
+    @transaction.atomic
     def patch(self, request, id):
         try:
             category = Category.objects.get(id=id, is_deleted=False)
@@ -160,7 +165,6 @@ class CategoryDetailAPIView(APIView):
             category.name = f"dlt_{category.name}"
             category.slug = f"dlt__{category.id}__{category.slug}"
             category.save(update_fields=["is_deleted", "name", "slug"])
-
             return Response(
                 {"status": 200, "detail": "Kategori silindi."},
                 status=status.HTTP_200_OK,
@@ -170,9 +174,21 @@ class CategoryDetailAPIView(APIView):
             name = (data_in.get("name") or "").strip()
             if name:
                 category.name = name
+                
+        if "name_eng" in data_in:
+            category.name_eng = (data_in.get("name_eng") or "").strip() or None
+            
 
         if "description" in data_in:
             category.description = data_in.get("description") or ""
+        if "description_eng" in data_in:
+            category.description_eng = data_in.get("description_eng") or ""
+
+        if "image_url" in data_in:
+            category.image_url = data_in.get("image_url") or None
+        
+        if "public_id" in data_in:
+            category.public_id = data_in.get("public_id") or None
 
         if "slug" in data_in:
             slug = (data_in.get("slug") or "").strip()
@@ -190,6 +206,7 @@ class CategoryDetailAPIView(APIView):
 
         category.save()
 
+        # Not: CategoryListSerializer'ın image_url ve public_id döndüğünden emin olmalısın.
         serializer = CategoryListSerializer(category)
 
         return Response(
@@ -738,7 +755,7 @@ class ProductCreateForProjectAPIView(APIView):
 
 class ProductListAPIView(ListAPIView):
     serializer_class = ProductListSerializer
-    pagination_class = Pagination10
+    pagination_class = Pagination30
 
     def get_queryset(self):
         image_qs = (
@@ -1992,6 +2009,7 @@ class BannerImageCreate(APIView):
             image_url = (item.get("image_url") or "").strip()
             public_id = (item.get("public_id") or "").strip()
             alt_text = (item.get("alt_text") or "").strip() or None
+            link_url = (item.get("link_url") or "").strip() or None
 
             if not image_url or not public_id:
                 return Response(
@@ -2005,6 +2023,7 @@ class BannerImageCreate(APIView):
                 image_url=image_url,
                 public_id=public_id,
                 alt_text=alt_text,
+                link_url=link_url,
                 is_primary=is_primary,
             )
 
@@ -2017,6 +2036,7 @@ class BannerImageCreate(APIView):
                     "image_url": banner_image.image_url,
                     "public_id": banner_image.public_id,
                     "alt_text": banner_image.alt_text,
+                    "link_url": banner_image.link_url,
                     "is_primary": banner_image.is_primary,
                     "created_at": banner_image.created_at,
                 }
@@ -2123,6 +2143,8 @@ class BannerImageDetailAPIView(APIView):
         image_url = data.get("image_url")
         public_id = data.get("public_id")
         alt_text = data.get("alt_text")
+        link_url = data.get("link_url")
+        is_primary = data.get("is_primary")
 
         if image_url is not None:
             banner_image.image_url = image_url
@@ -2132,6 +2154,13 @@ class BannerImageDetailAPIView(APIView):
 
         if alt_text is not None:
             banner_image.alt_text = alt_text
+
+        if link_url is not None:
+            banner_image.link_url = link_url
+
+        if is_primary is True or (isinstance(is_primary, str) and str(is_primary).lower() == "true"):
+            BannerImageModel.objects.filter(is_deleted=False, is_primary=True).exclude(id=banner_image.id).update(is_primary=False)
+            banner_image.is_primary = True
 
         banner_image.save()
 

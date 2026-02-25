@@ -17,7 +17,9 @@ class CategoryListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "name_eng",
             "description",
+            "description_eng",
             "slug",
             "is_deleted",
             "created_at",
@@ -147,6 +149,7 @@ class BannerImageListSerializer(serializers.ModelSerializer):
             "image_url",
             "alt_text",
             "public_id",
+            "link_url",
             "is_primary",
             "created_at",
         ]

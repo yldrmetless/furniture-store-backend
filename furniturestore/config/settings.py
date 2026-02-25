@@ -171,10 +171,12 @@ MEDIA_ROOT = os.environ.get("MEDIA_ROOT", "/var/data")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "https://furniture-store-frontend-seven.vercel.app"
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",
+#     "http://127.0.0.1:3000", # Tarayıcıdan bu IP ile girme ihtimaline karşı eklenmeli
+#     "https://furniture-store-frontend-seven.vercel.app"
+# ]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
 ]
