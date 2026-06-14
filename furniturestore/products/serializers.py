@@ -5,7 +5,8 @@ from .models import (
     Products,
     CatalogModel,
     LandingPage,
-    BannerImageModel
+    BannerImageModel,
+    LandingPageBanner
 )
 
 
@@ -113,7 +114,21 @@ ALLOWED_FONTS = {
 }
 
 
+class LandingPageBannerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandingPageBanner
+        fields = (
+            "id",
+            "image_url",
+            "public_id",
+            "alt_text",
+            "is_primary",
+        )
+
+
 class LandingPageListSerializer(serializers.ModelSerializer):
+    banners = serializers.SerializerMethodField()
+
     class Meta:
         model = LandingPage
         fields = (
@@ -127,7 +142,20 @@ class LandingPageListSerializer(serializers.ModelSerializer):
             "font_family",
             "title_en",
             "description_en",
+            "banners",
         )
+
+    def get_banners(self, obj):
+        if obj.section_key == "triple_section":
+            active_banners = obj.banners.filter(is_deleted=False)
+            return LandingPageBannerSerializer(active_banners, many=True).data
+        return None
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.section_key != "triple_section":
+            representation.pop("banners", None)
+        return representation
 
     def validate_title_font_family(self, value):
         if value and value not in ALLOWED_FONTS:
@@ -138,7 +166,6 @@ class LandingPageListSerializer(serializers.ModelSerializer):
         if value and value not in ALLOWED_FONTS:
             raise serializers.ValidationError("Geçersiz yazı tipi değeri.")
         return value
-    
 
 
 class BannerImageListSerializer(serializers.ModelSerializer):

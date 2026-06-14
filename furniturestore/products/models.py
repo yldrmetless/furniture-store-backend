@@ -6,7 +6,7 @@ from users.models import Users
 class Products(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
 
-    description = models.CharField(max_length=6000, null=True, blank=True)
+    description = models.CharField(max_length=40000, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -167,7 +167,23 @@ class LandingPage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+
+class LandingPageBanner(models.Model):
+    landing_page = models.ForeignKey(
+        LandingPage,
+        on_delete=models.CASCADE,
+        related_name="banners",
+    )
+    image_url = models.URLField(max_length=2000, null=True, blank=True)
     
+    public_id = models.CharField(max_length=255, blank=True, null=True)
+    
+    alt_text = models.CharField(max_length=255, blank=True, null=True)
+    
+    is_deleted = models.BooleanField(default=False)
+    
+    is_primary = models.BooleanField(default=False)
 
 
 class BannerImageModel(models.Model):

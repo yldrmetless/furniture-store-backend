@@ -28,7 +28,8 @@ from products.models import (
     CatalogModel,
     LandingPage,
     BannerImageModel,
-    Banner
+    Banner,
+    LandingPageBanner
 )
 from products.pagination import Pagination10, Pagination30
 from products.serializers import (
@@ -1792,7 +1793,7 @@ class LandingPagePostCreateAPIView(APIView):
         public_id = data.get("public_id")
         title_font_family = data.get("title_font_family")
         font_family = data.get("font_family")
-        
+        banners_data = data.get("banners", [])
 
         if not section_key:
             return Response(
@@ -1820,39 +1821,72 @@ class LandingPagePostCreateAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if section_key == "triple_section":
+            if not isinstance(banners_data, list):
+                return Response(
+                    {"detail": "Banner verileri liste formatında olmalıdır."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if len(banners_data) > 3:
+                return Response(
+                    {"detail": "En fazla 3 adet banner eklenebilir."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         try:
-            section = LandingPage.objects.create(
-                section_key=section_key,
-                title=title,
-                description=description,
-                title_en=title_en,
-                description_en=description_en,
-                image_url=image_url,
-                public_id=public_id,
-                title_font_family=title_font_family,
-                font_family=font_family,
-            )
+            with transaction.atomic():
+                section = LandingPage.objects.create(
+                    section_key=section_key,
+                    title=title,
+                    description=description,
+                    title_en=title_en,
+                    description_en=description_en,
+                    image_url=image_url,
+                    public_id=public_id,
+                    title_font_family=title_font_family,
+                    font_family=font_family,
+                )
+
+                created_banners = []
+                if section_key == "triple_section" and banners_data:
+                    for banner_item in banners_data:
+                        banner_obj = LandingPageBanner.objects.create(
+                            landing_page=section,
+                            image_url=banner_item.get("image_url"),
+                            public_id=banner_item.get("public_id"),
+                            alt_text=banner_item.get("alt_text"),
+                            is_primary=banner_item.get("is_primary", False)
+                        )
+                        created_banners.append({
+                            "id": banner_obj.id,
+                            "image_url": banner_obj.image_url,
+                            "public_id": banner_obj.public_id,
+                            "alt_text": banner_obj.alt_text,
+                            "is_primary": banner_obj.is_primary,
+                        })
         except IntegrityError:
             return Response(
                 {"detail": "Kayıt oluşturulamadı."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        return Response(
-            {
-                "id": section.id,
-                "section_key": section.section_key,
-                "title": section.title,
-                "description": section.description,
-                "title_en": section.title_en,
-                "description_en": section.description_en,
-                "image_url": section.image_url,
-                "public_id": section.public_id,
-                "title_font_family": section.title_font_family,
-                "font_family": section.font_family,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        response_data = {
+            "id": section.id,
+            "section_key": section.section_key,
+            "title": section.title,
+            "description": section.description,
+            "title_en": section.title_en,
+            "description_en": section.description_en,
+            "image_url": section.image_url,
+            "public_id": section.public_id,
+            "title_font_family": section.title_font_family,
+            "font_family": section.font_family,
+        }
+
+        if section_key == "triple_section":
+            response_data["banners"] = created_banners
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
         
 
 class LandingPageListAPIView(APIView):
@@ -1905,18 +1939,19 @@ class LandingPageDetailAPIView(APIView):
             )
 
         data = request.data
-        
-        
+
         is_deleted = data.get("is_deleted")
-        
+
         if is_deleted is True or (isinstance(is_deleted, str) and str(is_deleted).lower() == "true"):
-            landing_page.is_deleted = True
-            landing_page.save(update_fields=["is_deleted"])
+            with transaction.atomic():
+                landing_page.is_deleted = True
+                landing_page.save(update_fields=["is_deleted"])
+                LandingPageBanner.objects.filter(landing_page=landing_page).update(is_deleted=True)
             return Response(
                 {"detail": "Kayıt silindi."},
                 status=status.HTTP_200_OK,
             )
-            
+
         title = data.get("title")
         description = data.get("description")
         title_en = data.get("title_en")
@@ -1926,13 +1961,34 @@ class LandingPageDetailAPIView(APIView):
         title_font_family = data.get("title_font_family")
         font_family = data.get("font_family")
         section_key = data.get("section_key")
+        banners_data = data.get("banners")
+
+        current_section_key = section_key if section_key is not None else landing_page.section_key
+
+        if current_section_key == "triple_section" and banners_data is not None:
+            if not isinstance(banners_data, list):
+                return Response(
+                    {"detail": "Banner verileri liste formatında olmalıdır."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            active_banners_count = 0
+            for banner_item in banners_data:
+                if banner_item.get("is_deleted") is not True:
+                    active_banners_count += 1
+            
+            if active_banners_count > 3:
+                return Response(
+                    {"detail": "En fazla 3 adet banner eklenebilir."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if title is not None:
             landing_page.title = title.strip()
 
         if description is not None:
             landing_page.description = description
-            
+
         if title_en is not None:
             landing_page.title_en = title_en.strip()
 
@@ -1944,7 +2000,7 @@ class LandingPageDetailAPIView(APIView):
 
         if public_id is not None:
             landing_page.public_id = public_id
-            
+
         if section_key is not None:
             landing_page.section_key = section_key
 
@@ -1964,7 +2020,46 @@ class LandingPageDetailAPIView(APIView):
                 )
             landing_page.font_family = font_family
 
-        landing_page.save()
+        try:
+            with transaction.atomic():
+                landing_page.save()
+
+                if current_section_key == "triple_section" and banners_data is not None:
+                    for banner_item in banners_data:
+                        banner_id = banner_item.get("id")
+                        
+                        if banner_id:
+                            try:
+                                banner_obj = LandingPageBanner.objects.get(id=banner_id, landing_page=landing_page)
+                                if banner_item.get("is_deleted") is True:
+                                    banner_obj.is_deleted = True
+                                    banner_obj.save(update_fields=["is_deleted"])
+                                else:
+                                    if "image_url" in banner_item:
+                                        banner_obj.image_url = banner_item.get("image_url")
+                                    if "public_id" in banner_item:
+                                        banner_obj.public_id = banner_item.get("public_id")
+                                    if "alt_text" in banner_item:
+                                        banner_obj.alt_text = banner_item.get("alt_text")
+                                    if "is_primary" in banner_item:
+                                        banner_obj.is_primary = banner_item.get("is_primary")
+                                    banner_obj.save()
+                            except LandingPageBanner.DoesNotExist:
+                                continue
+                        else:
+                            if banner_item.get("is_deleted") is not True:
+                                LandingPageBanner.objects.create(
+                                    landing_page=landing_page,
+                                    image_url=banner_item.get("image_url"),
+                                    public_id=banner_item.get("public_id"),
+                                    alt_text=banner_item.get("alt_text"),
+                                    is_primary=banner_item.get("is_primary", False)
+                                )
+        except IntegrityError:
+            return Response(
+                {"detail": "Kayıt güncellenemedi."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = LandingPageListSerializer(landing_page)
         return Response(serializer.data)
